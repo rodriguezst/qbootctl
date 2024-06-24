@@ -84,10 +84,10 @@ int usage()
 	fprintf(stderr, "    -a               get the active slot\n");
 	fprintf(stderr, "    -b SLOT          check if SLOT is marked as bootable\n");
 	fprintf(stderr, "    -n SLOT          check if SLOT is marked as successful\n");
-	fprintf(stderr, "    -x [SLOT]        get the slot suffix for SLOT (default: current)\n");
+	fprintf(stderr, "    -x [SLOT]        get the slot suffix for SLOT (default: active)\n");
 	fprintf(stderr, "    -s SLOT          set to active slot to SLOT\n");
-	fprintf(stderr, "    -m [SLOT]        mark a boot as successful (default: current)\n");
-	fprintf(stderr, "    -u [SLOT]        mark SLOT as unbootable (default: current)\n");
+	fprintf(stderr, "    -m [SLOT]        mark a boot as successful (default: active)\n");
+	fprintf(stderr, "    -u [SLOT]        mark SLOT as unbootable (default: active)\n");
 	fprintf(stderr, "    -i               still write the GPT headers even if the UFS bLun can't be changed (default: false)\n");
 	// clang-format on
 
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 	}
 
 	if (slot < 0)
-		slot = impl->getCurrentSlot();
+		slot = impl->getActiveBootSlot();
 
 	optflag = getopt(argc, argv, "hcmas:ub:n:x");
 

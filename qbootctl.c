@@ -77,8 +77,9 @@ int usage()
 	// clang-format off
 	fprintf(stderr, "qbootctl: qcom bootctrl HAL port for Linux\n");
 	fprintf(stderr, "-------------------------------------------\n");
-	fprintf(stderr, "qbootctl [-c|-m|-s|-u|-b|-n|-x] [SLOT]\n\n");
+	fprintf(stderr, "qbootctl [-c|-m|-s|-u|-b|-n|-x|-j] [SLOT]\n\n");
 	fprintf(stderr, "    <no args>        dump slot info (default)\n");
+	fprintf(stderr, "    -j               dump slot info in JSON\n");
 	fprintf(stderr, "    -h               this help text\n");
 	fprintf(stderr, "    -c               get the current slot\n");
 	fprintf(stderr, "    -a               get the active slot\n");
@@ -132,6 +133,34 @@ void dump_info()
 	}
 }
 
+void dump_info_json()
+{
+    struct slot_info slots[2] = { { 0 } };
+    int current_slot = impl->getCurrentSlot();
+    int active_slot = impl->getActiveBootSlot();
+
+    get_slot_info(slots);
+
+    printf("{\n");
+    printf("  \"current\": \"%s\",\n",
+	       current_slot >= 0 ? impl->getSuffix(current_slot) : "N/A");
+    printf("  \"active\": \"%s\",\n",
+	       active_slot >= 0 ? impl->getSuffix(active_slot) : "N/A");
+    printf("  \"slots\": [\n");
+
+    for (int i = 0; i < 2; i++) {
+        printf("    {\n");
+        printf("      \"slot\": \"%s\",\n", impl->getSuffix(i));
+        printf("      \"active\": %d,\n", slots[i].active);
+        printf("      \"successful\": %d,\n", slots[i].successful);
+        printf("      \"bootable\": %d\n", slots[i].bootable);
+        printf("    }%s\n", i < 1 ? "," : "");
+    }
+
+    printf("  ]\n");
+    printf("}\n");
+}
+
 int main(int argc, char **argv)
 {
 	int optflag;
@@ -160,9 +189,12 @@ int main(int argc, char **argv)
 	if (slot < 0)
 		slot = impl->getActiveBootSlot();
 
-	optflag = getopt(argc, argv, "hcmas:ub:n:x");
+	optflag = getopt(argc, argv, "jhcmas:ub:n:x");
 
 	switch (optflag) {
+	case 'j':
+		dump_info_json();
+		return 0;
 	case 'c':
 		slot = impl->getCurrentSlot();
 		printf("Current slot: %s\n", impl->getSuffix(slot));

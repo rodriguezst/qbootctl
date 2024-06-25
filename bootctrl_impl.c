@@ -430,7 +430,8 @@ static int boot_ctl_set_active_slot_for_partitions(struct gpt_disk *disk,
 	char slotB[MAX_GPT_NAME_SIZE] = { 0 };
 	char active_guid[TYPE_GUID_SIZE + 1] = { 0 };
 	char inactive_guid[TYPE_GUID_SIZE + 1] = { 0 };
-	int rc, i;
+	int rc;
+	size_t i;
 	// Pointer to the partition entry of current 'A' partition
 	uint8_t *pentryA = NULL;
 	uint8_t *pentryA_bak = NULL;

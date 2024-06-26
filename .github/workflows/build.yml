@@ -1,0 +1,94 @@
+name: build
+on:
+  workflow_dispatch:
+  push:
+
+env:
+  KERNEL_REPO: 'rodriguezst/linux'
+  KERNEL_REF: 'v6.1.10-nabu-maverickjb'
+  QBOOTCTL_PREV_REF: '0.2.0'
+
+jobs:
+  qbootctl:
+    name: Build qbootctl
+    runs-on: ubuntu-latest
+    steps:
+      - id: time
+        uses: boredland/get-time-action@2.0.0
+        with:
+          format: 'YYYYMMDD-HHmmss'
+
+      - name: Checkout kernel repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.KERNEL_REPO }}
+          ref: ${{ env.KERNEL_REF }}
+          path: kernel
+          fetch-depth: '1'
+
+      - name: Checkout qbootctl repo
+        uses: actions/checkout@v4
+        with:
+          path: qbootctl
+          fetch-depth: '0'
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      
+      - name: Write script for docker
+        run: |
+          echo "#!/bin/bash" > run-in-docker.sh
+          echo "export DEBIAN_FRONTEND=noninteractive" >> run-in-docker.sh
+          echo "apt update" >> run-in-docker.sh
+          echo "apt -y install make rsync zlib1g-dev meson cmake" >> run-in-docker.sh
+          echo "cd kernel" >> run-in-docker.sh
+          echo "make headers_install" >> run-in-docker.sh
+          echo "cd ../qbootctl" >> run-in-docker.sh
+          echo "meson build" >> run-in-docker.sh
+          echo "meson compile -C build" >> run-in-docker.sh
+          chmod +x run-in-docker.sh
+
+      - name: Run in Docker
+        run: |
+          docker run \
+            --rm \
+            -v $(pwd):/${{ github.workspace }} \
+            -w ${{ github.workspace }} \
+            --platform linux/arm64 \
+            ubuntu:latest \
+            bash run-in-docker.sh
+
+      - name: Upload built artifacts
+        uses: actions/upload-artifact@v4.0.0
+        with:
+          # Artifact name
+          name: qbootctl
+          path: ${{ github.workspace }}/qbootctl/build/qbootctl
+
+      - name: Write release notes
+        run: |
+          cd qbootctl
+          CURRENT_SHA=$(git rev-parse --short HEAD)
+          echo "# CHANGELOG (https://github.com/${{ github.repository }}/compare/$QBOOTCTL_PREV_REF...$CURRENT_SHA)" > ${{ github.workspace }}/RELEASE.md
+          for commit in $(git rev-list $QBOOTCTL_PREV_REF..HEAD); do
+            echo "- [$(git log --format=%s -n 1 $commit)](https://github.com/${{ github.repository }}/commit/$commit)" >> ${{ github.workspace }}/RELEASE.md
+          done
+          echo "# NOTES" >> ${{ github.workspace }}/RELEASE.md
+          echo "To automatically set active partition as successful on startup install [qbootctl-openrc.initd](https://git.alpinelinux.org/aports/tree/community/qbootctl/qbootctl-openrc.initd) to /etc/init.d/qbootctl" >> ${{ github.workspace }}/RELEASE.md
+          echo "# MORE INFO" >> ${{ github.workspace }}/RELEASE.md
+          echo "**Build Log**: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> ${{ github.workspace }}/RELEASE.md
+
+      - name: Release assets
+        uses: softprops/action-gh-release@v2.0.6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.time.outputs.time }}_${{ github.run_id }}
+          name: Release ${{ steps.time.outputs.time }}
+          body_path: ${{ github.workspace }}/RELEASE.md
+          draft: false
+          prerelease: false
+          files: |
+            ${{ github.workspace }}/qbootctl/build/qbootctl
